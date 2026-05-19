@@ -1,0 +1,43 @@
+# Build artifacts
+bin/
+dist/
+build/
+*.spec.bak
+backend-dist/
+dist-renderer/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Electron
+out/
+release/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local config / data
+.env
+.env.local
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.faiss
+logs/

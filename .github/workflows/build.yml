@@ -1,0 +1,83 @@
+name: Build Windows portable
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r requirements.txt
+          pip install pyinstaller==6.11.1
+
+      - name: Build backend.exe (PyInstaller onedir)
+        working-directory: backend
+        run: |
+          pyinstaller --noconfirm --distpath ..\backend-dist --workpath ..\backend-build backend.spec
+          if (-not (Test-Path "..\backend-dist\backend\backend.exe")) { throw "backend.exe not produced" }
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Build renderer + electron app
+        working-directory: frontend
+        run: npm run build
+
+      - name: Collect portable folder
+        shell: pwsh
+        run: |
+          if (Test-Path bin\InvestNet) { Remove-Item bin\InvestNet -Recurse -Force }
+          New-Item -ItemType Directory -Path bin\InvestNet | Out-Null
+          if (-not (Test-Path bin\win-unpacked)) { throw "bin\win-unpacked not found" }
+          Copy-Item -Path bin\win-unpacked\* -Destination bin\InvestNet -Recurse -Force
+          Compress-Archive -Path bin\InvestNet\* -DestinationPath bin\InvestNet-portable.zip -Force
+          Get-ChildItem bin
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: InvestNet-portable
+          path: bin/InvestNet-portable.zip
+          retention-days: 30
+
+      - name: Upload NSIS installer (if produced)
+        uses: actions/upload-artifact@v4
+        if: hashFiles('bin/InvestNet-*-setup.exe') != ''
+        with:
+          name: InvestNet-setup
+          path: bin/InvestNet-*-setup.exe
+          retention-days: 30
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/InvestNet-portable.zip
+            bin/InvestNet-*-setup.exe
